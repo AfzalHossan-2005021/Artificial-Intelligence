@@ -67,8 +67,6 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
     priority_queue<pair<int, search_node*>, vector<pair<int, search_node*>>, greater<pair<int, search_node*>>> open_list;
     search_node *initial_search_node = new search_node(grid, 0, NULL, blank_row, blank_col);
     open_list.push({priority_function(initial_search_node, heuristic_function), initial_search_node});
-    queue<search_node*> closed_list;
-    search_node *path_last_node = NULL;
 
     // Neighbor board creation function
     auto create_Neighbor_board = [&](search_node *current_node, int old_row, int old_col, int new_row, int new_col){
@@ -81,6 +79,9 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         }
     };
 
+    // Expanding the nodes
+    queue<search_node*> closed_list;
+    search_node *path_last_node = NULL;
     while(!open_list.empty()){
         search_node *current_node = open_list.top().second;
         open_list.pop();
@@ -91,6 +92,8 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         }
         int row = current_node->blank_row;
         int col = current_node->blank_col;
+
+        // Creating the neighbor boards
         if(row > 0){
             create_Neighbor_board(current_node, row, col, row - 1, col);
         }
@@ -105,6 +108,7 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         }
     }
 
+    // Determining the path to reach the goal state using the parent pointers
     stack<search_node*> path;
     while(path_last_node != NULL){
         path.push(path_last_node);
@@ -112,7 +116,8 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
     }
 
     cout << "The optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
-
+    
+    // Printing the steps
     cout << "The steps are as follow: " << endl;
     while(!path.empty()){
         search_node *current_node = path.top();
@@ -130,8 +135,8 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         cout << endl;
     }
 
-    cout << "Explored nodes: " << closed_list.size() << endl;
-    cout << "Expanded nodes: " << open_list.size() << endl;
+    cout << "Explored nodes: " << open_list.size() << endl;
+    cout << "Expanded nodes: " << closed_list.size() << endl;
     cout << endl;
 }
 
@@ -155,12 +160,18 @@ int main() {
             }
         }
     }
+
+    /***Check if the given board state is solvable or not***/
+
+    // Linearizing the grid
     vector<int> linearized_grid(k*k + 1);
     for (int i = 0; i < k; i++) {
         for (int j = 0; j < k; j++) {
             linearized_grid[i*k + j + 1] = grid[i][j];
         }
     }
+
+    // Count the number of inversions
     int inversions = 0;
     for(int i = 1; i <= k*k; i++){
         for(int j = i + 1; j <= k*k; j++){
@@ -194,6 +205,7 @@ int main() {
         return 0;
     }
 
+    // Determining goal state
     vector<vector<int>> goal(k, vector<int>(k));
     for(int i = 0; i < k; i++){
         for(int j = 0; j < k; j++){
@@ -207,4 +219,6 @@ int main() {
 
     cout << "Optimal solution using manhattan distance heuristic: " << endl << endl;
     A_star_search(k, grid, goal, blank_row, blank_col, &manhattan_distance);
+
+    return 0;
 }
