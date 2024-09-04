@@ -62,12 +62,25 @@ int priority_function(search_node *node, int (*func) (vector<vector<int>> &board
     return node->move_count + func(node->board);
 }
 
+// A* search algorithm
 void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, int blank_row, int blank_col, int (*heuristic_function) (vector<vector<int>> &board)){
     priority_queue<pair<int, search_node*>, vector<pair<int, search_node*>>, greater<pair<int, search_node*>>> open_list;
     search_node *initial_search_node = new search_node(grid, 0, NULL, blank_row, blank_col);
     open_list.push({priority_function(initial_search_node, heuristic_function), initial_search_node});
     queue<search_node*> closed_list;
     search_node *path_last_node = NULL;
+
+    // Neighbor board creation function
+    auto create_Neighbor_board = [&](search_node *current_node, int old_row, int old_col, int new_row, int new_col){
+        search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, new_row, new_col);
+        swap(new_node->board[old_row][old_col], new_node->board[new_row][new_col]);
+        if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
+            open_list.push({priority_function(new_node, heuristic_function), new_node});
+        } else {
+            delete new_node;
+        }
+    };
+
     while(!open_list.empty()){
         search_node *current_node = open_list.top().second;
         open_list.pop();
@@ -79,32 +92,16 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         int row = current_node->blank_row;
         int col = current_node->blank_col;
         if(row > 0){
-            search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, row - 1, col);
-            swap(new_node->board[row][col], new_node->board[row - 1][col]);
-            if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
-                open_list.push({priority_function(new_node, heuristic_function), new_node});
-            }
+            create_Neighbor_board(current_node, row, col, row - 1, col);
         }
         if(row < k - 1){
-            search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, row + 1, col);
-            swap(new_node->board[row][col], new_node->board[row + 1][col]);
-            if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
-                open_list.push({priority_function(new_node, heuristic_function), new_node});
-            }
+            create_Neighbor_board(current_node, row, col, row + 1, col);
         }
         if(col > 0){
-            search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, row, col - 1);
-            swap(new_node->board[row][col], new_node->board[row][col - 1]);
-            if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
-                open_list.push({priority_function(new_node, heuristic_function), new_node});
-            }
+            create_Neighbor_board(current_node, row, col, row, col - 1);
         }
         if(col < k - 1){
-            search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, row, col + 1);
-            swap(new_node->board[row][col], new_node->board[row][col + 1]);
-            if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
-                open_list.push({priority_function(new_node, heuristic_function), new_node});
-            }
+            create_Neighbor_board(current_node, row, col, row, col + 1);
         }
     }
 
@@ -114,7 +111,7 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
         path_last_node = path_last_node->parent;
     }
 
-    cout << "the optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
+    cout << "The optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
 
     cout << "The steps are as follow: " << endl;
     while(!path.empty()){
@@ -142,7 +139,7 @@ int main() {
     int k;
     cout << "Enter grid size, k: ";
     cin >> k;
-    cout << "Enter the the initial board position (Each row in seperate line): " << endl;
+    cout << "Enter the initial board position:" << endl;
     vector<vector<int>> grid(k, vector<int>(k));
     int blank_row, blank_col;
     for (int i = 0; i < k; i++) {
@@ -191,12 +188,11 @@ int main() {
         }
     }
     if(is_solvable){
-        cout << "The given board state is solvable" << endl;
+        cout << endl << "The given board state is solvable." << endl << endl;
     } else {
-        cout << "The given board state is not Solvable" << endl;
+        cout << endl << "The given board state is not Solvable." << endl;
         return 0;
     }
-    cout << endl;
 
     vector<vector<int>> goal(k, vector<int>(k));
     for(int i = 0; i < k; i++){
