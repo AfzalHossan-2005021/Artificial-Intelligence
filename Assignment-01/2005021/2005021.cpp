@@ -4,14 +4,11 @@ using namespace std;
 class search_node {
     public:
         vector<vector<char>> board;
-        int move_count;
-        search_node *parent;
-        int blank_row, blank_col;
+        int move_count, blank_row, blank_col;
         string path = "";
-        search_node(vector<vector<char>> board, int move_count, search_node *parent, int blank_row, int blank_col){
+        search_node(vector<vector<char>> board, int move_count, int blank_row, int blank_col){
             this->board = board;
             this->move_count = move_count;
-            this->parent = parent;
             this->blank_row = blank_row;
             this->blank_col = blank_col;
         }
@@ -100,13 +97,13 @@ void print_path(search_node *node, int index){
 void A_star_search(int k, vector<vector<char>> &grid, vector<vector<char>> &goal, int blank_row, int blank_col, int (*heuristic_function) (vector<vector<char>> &board)){
     priority_queue<pair<int, search_node*>, vector<pair<int, search_node*>>, greater<pair<int, search_node*>>> open_list;
     set<long long> checked_states;
-    search_node *initial_search_node = new search_node(grid, 0, NULL, blank_row, blank_col);
+    search_node *initial_search_node = new search_node(grid, 0, blank_row, blank_col);
     open_list.push({priority_function(initial_search_node, heuristic_function), initial_search_node});
     checked_states.insert(hash_board(grid));
 
     // Neighbor board creation function
     auto create_Neighbor_board = [&](search_node *current_node, int old_row, int old_col, int new_row, int new_col){
-        search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, new_row, new_col);
+        search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, new_row, new_col);
         swap(new_node->board[old_row][old_col], new_node->board[new_row][new_col]);
         if(checked_states.find(hash_board(new_node->board)) == checked_states.end()){
             open_list.push({priority_function(new_node, heuristic_function), new_node});
@@ -126,17 +123,12 @@ void A_star_search(int k, vector<vector<char>> &grid, vector<vector<char>> &goal
     };
 
     // Expanding the nodes
-    queue<search_node*> closed_list;
-    search_node *path_last_node = NULL;
+    long long expanded_nodes = 0, explored_nodes = 0;
+    search_node path_last_node = *initial_search_node;
     long long goal_hash = hash_board(goal);
     while(!open_list.empty()){
         search_node *current_node = open_list.top().second;
         open_list.pop();
-        closed_list.push(current_node);
-        if(hash_board(current_node->board) == goal_hash){
-            path_last_node = current_node;
-            break;
-        }
         int row = current_node->blank_row;
         int col = current_node->blank_col;
 
@@ -153,58 +145,30 @@ void A_star_search(int k, vector<vector<char>> &grid, vector<vector<char>> &goal
         if(col < k - 1){
             create_Neighbor_board(current_node, row, col, row, col + 1);
         }
+        expanded_nodes++;
+        if(hash_board(current_node->board) == goal_hash){
+            path_last_node = *current_node;
+            delete current_node;
+            break;
+        }
+        delete current_node;
+    }
+
+    while(!open_list.empty()){
+        delete open_list.top().second;
+        open_list.pop();
+        explored_nodes++;
     }
 
     // Determining the path to reach the goal state using the parent pointers
-
-    stack<search_node> path;
-    cout << "The optimal cost to reach the goal state: " << path_last_node->path.size() << endl << endl;
+    cout << "The optimal cost to reach the goal state: " << path_last_node.path.size() << endl << endl;
 
     // Printing the steps
     cout << "The steps are as follow: " << endl;
-    search_node tmp = *path_last_node;
-    print_path(&tmp, tmp.path.size() - 1);
+    print_path(&path_last_node, path_last_node.path.size() - 1);
 
-    // path.push(*path_last_node);
-    // for(int i = path_last_node->path.size() - 1; i >= 0; i--){
-    //     if(path_last_node->path[i] == 'U'){
-    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row + 1][path_last_node->blank_col]);
-    //         path_last_node->blank_row++;
-    //     } else if(path_last_node->path[i] == 'D'){
-    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row - 1][path_last_node->blank_col]);
-    //         path_last_node->blank_row--;
-    //     } else if(path_last_node->path[i] == 'L'){
-    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row][path_last_node->blank_col + 1]);
-    //         path_last_node->blank_col++;
-    //     } else if(path_last_node->path[i] == 'R'){
-    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row][path_last_node->blank_col - 1]);
-    //         path_last_node->blank_col--;
-    //     }
-    //     path.push(*path_last_node);
-    // }
-
-    // cout << "The optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
-    
-    // // Printing the steps
-    // cout << "The steps are as follow: " << endl;
-    // while(!path.empty()){
-    //     search_node current_node = path.top();
-    //     path.pop();
-    //     for(int i = 0; i < k; i++){
-    //         for(int j = 0; j < k; j++){
-    //             if(current_node.board[i][j] == 0){
-    //                 cout << "* ";
-    //                 continue;
-    //             }
-    //             cout << (int)current_node.board[i][j] << " ";
-    //         }
-    //         cout << endl;
-    //     }
-    //     cout << endl;
-    // }
-
-    cout << "Explored nodes: " << open_list.size() << endl;
-    cout << "Expanded nodes: " << closed_list.size() << endl;
+    cout << "Explored nodes: " << explored_nodes << endl;
+    cout << "Expanded nodes: " << expanded_nodes << endl;
     cout << endl;
 }
 
