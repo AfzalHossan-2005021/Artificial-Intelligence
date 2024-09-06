@@ -3,38 +3,27 @@ using namespace std;
 
 class search_node {
     public:
-        vector<vector<int>> board;
+        vector<vector<char>> board;
         int move_count;
         search_node *parent;
         int blank_row, blank_col;
-        search_node(vector<vector<int>> board, int move_count, search_node *parent, int blank_row, int blank_col){
+        string path = "";
+        search_node(vector<vector<char>> board, int move_count, search_node *parent, int blank_row, int blank_col){
             this->board = board;
             this->move_count = move_count;
             this->parent = parent;
             this->blank_row = blank_row;
             this->blank_col = blank_col;
         }
-        bool equal_board(const vector<vector<int>> &other) {
-            bool is_equal = true;
-            for(int i = 0; i < board.size(); i++){
-                for(int j = 0; j < board.size(); j++){
-                    if(board[i][j] != other[i][j]){
-                        is_equal = false;
-                        break;
-                    }
-                }
-            }
-            return is_equal;
-        }
 };
 
 // Hamming distance is the number of tiles that are not in their final position
-int hamming_distance(vector<vector<int>> &board){
+int hamming_distance(vector<vector<char>> &board){
     int k = board.size();
     int hamming_distance = 0;
     for(int i = 0; i < k; i++){
         for(int j = 0; j < k; j++){
-            if(board[i][j] == -1) continue;
+            if(board[i][j] == 0) continue;
             if(board[i][j] != i*k + j + 1){
                 hamming_distance++;
             }
@@ -44,12 +33,12 @@ int hamming_distance(vector<vector<int>> &board){
 }
 
 // Manhattan distance is the sum of the distances of each tile from its final position
-int manhattan_distance(vector<vector<int>> &board){
+int manhattan_distance(vector<vector<char>> &board){
     int k = board.size();
     int manhattan_distance = 0;
     for(int i = 0; i < k; i++){
         for(int j = 0; j < k; j++){
-            if(board[i][j] == -1) continue;
+            if(board[i][j] == 0) continue;
             int actual_row = (board[i][j] - 1) / k;
             int actual_col = (board[i][j] - 1) % k;
             manhattan_distance += abs(i - actual_row) + abs(j - actual_col);
@@ -58,22 +47,79 @@ int manhattan_distance(vector<vector<int>> &board){
     return manhattan_distance;
 }
 
-int priority_function(search_node *node, int (*func) (vector<vector<int>> &board)){
+int priority_function(search_node *node, int (*func) (vector<vector<char>> &board)){
     return node->move_count + func(node->board);
 }
 
+// Hash function for board state
+long long hash_board(vector<vector<char>> &board){
+    long long hash_value = 0;
+    long long base = 7;
+    long long mult = 1;
+    for(int i = 0; i < board.size(); i++){
+        for(int j = 0; j < board.size(); j++){
+            hash_value += mult * board[i][j];
+            mult *= base;
+        }
+    }
+    return hash_value;
+}
+
+void print_path(search_node *node, int index){
+    search_node tmp = *node;
+    if(index > -1){
+        if(node->path[index] == 'U'){
+            swap(node->board[node->blank_row][node->blank_col], node->board[node->blank_row + 1][node->blank_col]);
+            node->blank_row++;
+        } else if(node->path[index] == 'D'){
+            swap(node->board[node->blank_row][node->blank_col], node->board[node->blank_row - 1][node->blank_col]);
+            node->blank_row--;
+        } else if(node->path[index] == 'L'){
+            swap(node->board[node->blank_row][node->blank_col], node->board[node->blank_row][node->blank_col + 1]);
+            node->blank_col++;
+        } else if(node->path[index] == 'R'){
+            swap(node->board[node->blank_row][node->blank_col], node->board[node->blank_row][node->blank_col - 1]);
+            node->blank_col--;
+        }
+        print_path(node, index - 1);
+    }
+    for(int i = 0; i < tmp.board.size(); i++){
+        for(int j = 0; j < tmp.board.size(); j++){
+            if(tmp.board[i][j] == 0){
+                cout << "* ";
+                continue;
+            }
+            cout << (int)tmp.board[i][j] << " ";
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
+
 // A* search algorithm
-void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, int blank_row, int blank_col, int (*heuristic_function) (vector<vector<int>> &board)){
+void A_star_search(int k, vector<vector<char>> &grid, vector<vector<char>> &goal, int blank_row, int blank_col, int (*heuristic_function) (vector<vector<char>> &board)){
     priority_queue<pair<int, search_node*>, vector<pair<int, search_node*>>, greater<pair<int, search_node*>>> open_list;
+    set<long long> checked_states;
     search_node *initial_search_node = new search_node(grid, 0, NULL, blank_row, blank_col);
     open_list.push({priority_function(initial_search_node, heuristic_function), initial_search_node});
+    checked_states.insert(hash_board(grid));
 
     // Neighbor board creation function
     auto create_Neighbor_board = [&](search_node *current_node, int old_row, int old_col, int new_row, int new_col){
         search_node *new_node = new search_node(current_node->board, current_node->move_count + 1, current_node, new_row, new_col);
         swap(new_node->board[old_row][old_col], new_node->board[new_row][new_col]);
-        if(current_node->parent == NULL || !new_node->equal_board(current_node->parent->board)){
+        if(checked_states.find(hash_board(new_node->board)) == checked_states.end()){
             open_list.push({priority_function(new_node, heuristic_function), new_node});
+            checked_states.insert(hash_board(new_node->board));
+            if(new_row == old_row + 1){
+                new_node->path = current_node->path + "D";
+            } else if(new_row == old_row - 1){
+                new_node->path = current_node->path + "U";
+            } else if(new_col == old_col + 1){
+                new_node->path = current_node->path + "R";
+            } else if(new_col == old_col - 1){
+                new_node->path = current_node->path + "L";
+            }
         } else {
             delete new_node;
         }
@@ -82,11 +128,12 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
     // Expanding the nodes
     queue<search_node*> closed_list;
     search_node *path_last_node = NULL;
+    long long goal_hash = hash_board(goal);
     while(!open_list.empty()){
         search_node *current_node = open_list.top().second;
         open_list.pop();
         closed_list.push(current_node);
-        if(current_node->equal_board(goal)) {
+        if(hash_board(current_node->board) == goal_hash){
             path_last_node = current_node;
             break;
         }
@@ -109,31 +156,52 @@ void A_star_search(int k, vector<vector<int>> &grid, vector<vector<int>> &goal, 
     }
 
     // Determining the path to reach the goal state using the parent pointers
-    stack<search_node*> path;
-    while(path_last_node != NULL){
-        path.push(path_last_node);
-        path_last_node = path_last_node->parent;
-    }
 
-    cout << "The optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
-    
+    stack<search_node> path;
+    cout << "The optimal cost to reach the goal state: " << path_last_node->path.size() << endl << endl;
+
     // Printing the steps
     cout << "The steps are as follow: " << endl;
-    while(!path.empty()){
-        search_node *current_node = path.top();
-        path.pop();
-        for(int i = 0; i < k; i++){
-            for(int j = 0; j < k; j++){
-                if(current_node->board[i][j] == -1){
-                    cout << "* ";
-                    continue;
-                }
-                cout << current_node->board[i][j] << " ";
-            }
-            cout << endl;
-        }
-        cout << endl;
-    }
+    search_node tmp = *path_last_node;
+    print_path(&tmp, tmp.path.size() - 1);
+
+    // path.push(*path_last_node);
+    // for(int i = path_last_node->path.size() - 1; i >= 0; i--){
+    //     if(path_last_node->path[i] == 'U'){
+    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row + 1][path_last_node->blank_col]);
+    //         path_last_node->blank_row++;
+    //     } else if(path_last_node->path[i] == 'D'){
+    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row - 1][path_last_node->blank_col]);
+    //         path_last_node->blank_row--;
+    //     } else if(path_last_node->path[i] == 'L'){
+    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row][path_last_node->blank_col + 1]);
+    //         path_last_node->blank_col++;
+    //     } else if(path_last_node->path[i] == 'R'){
+    //         swap(path_last_node->board[path_last_node->blank_row][path_last_node->blank_col], path_last_node->board[path_last_node->blank_row][path_last_node->blank_col - 1]);
+    //         path_last_node->blank_col--;
+    //     }
+    //     path.push(*path_last_node);
+    // }
+
+    // cout << "The optimal cost to reach the goal state: " << path.size() - 1 << endl << endl;
+    
+    // // Printing the steps
+    // cout << "The steps are as follow: " << endl;
+    // while(!path.empty()){
+    //     search_node current_node = path.top();
+    //     path.pop();
+    //     for(int i = 0; i < k; i++){
+    //         for(int j = 0; j < k; j++){
+    //             if(current_node.board[i][j] == 0){
+    //                 cout << "* ";
+    //                 continue;
+    //             }
+    //             cout << (int)current_node.board[i][j] << " ";
+    //         }
+    //         cout << endl;
+    //     }
+    //     cout << endl;
+    // }
 
     cout << "Explored nodes: " << open_list.size() << endl;
     cout << "Expanded nodes: " << closed_list.size() << endl;
@@ -145,14 +213,14 @@ int main() {
     cout << "Enter grid size, k: ";
     cin >> k;
     cout << "Enter the initial board position:" << endl;
-    vector<vector<int>> grid(k, vector<int>(k));
+    vector<vector<char>> grid(k, vector<char>(k));
     int blank_row, blank_col;
     for (int i = 0; i < k; i++) {
         for (int j = 0; j < k; j++) {
             string s;
             cin >> s;
             if(s == "*"){
-                grid[i][j] = -1;
+                grid[i][j] = 0;
                 blank_row = i;
                 blank_col = j;
             } else {
@@ -175,7 +243,7 @@ int main() {
     int inversions = 0;
     for(int i = 1; i <= k*k; i++){
         for(int j = i + 1; j <= k*k; j++){
-            if(linearized_grid[i] == -1 || linearized_grid[j] == -1){
+            if(linearized_grid[i] == 0 || linearized_grid[j] == 0){
                 continue;
             }
             if(linearized_grid[i] > linearized_grid[j]){
@@ -206,16 +274,16 @@ int main() {
     }
 
     // Determining goal state
-    vector<vector<int>> goal(k, vector<int>(k));
+    vector<vector<char>> goal(k, vector<char>(k));
     for(int i = 0; i < k; i++){
         for(int j = 0; j < k; j++){
             goal[i][j] = i*k + j + 1;
         }
     }
-    goal[k-1][k-1] = -1;
+    goal[k-1][k-1] = 0;
 
-    cout << "Optimal solution using Hamming distance heuristic: " << endl << endl;
-    A_star_search(k, grid, goal, blank_row, blank_col, &hamming_distance);
+    // cout << "Optimal solution using Hamming distance heuristic: " << endl << endl;
+    // A_star_search(k, grid, goal, blank_row, blank_col, &hamming_distance);
 
     cout << "Optimal solution using manhattan distance heuristic: " << endl << endl;
     A_star_search(k, grid, goal, blank_row, blank_col, &manhattan_distance);
