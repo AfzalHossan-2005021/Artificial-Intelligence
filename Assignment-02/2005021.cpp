@@ -2,6 +2,8 @@
 
 using namespace std;
 
+const int TOTAL_BINS = 14;
+
 const int PLAYER_A = 7;
 const int PLAYER_B = 14;
 
@@ -29,6 +31,21 @@ public:
     }
     bool isBinEmpty(int bin){
         return board[bin] == 0;
+    }
+    void move(int player, int bin, int depth, bool manualMove = false){
+        if(bin < player - 6 || bin >= player || isBinEmpty(bin)){
+            return;
+        }
+        int stones = board[bin];
+        board[bin] = 0;
+        while(stones > 0){
+            bin++;
+            if(bin > TOTAL_BINS) bin = 1;
+            if(player == PLAYER_A && bin == PLAYER_B) continue;
+            if(player == PLAYER_B && bin == PLAYER_A) continue;
+            board[bin]++;
+            stones--;
+        }
     }
     void printBoard(){
         for(int i = 13; i >= 8; i--){
