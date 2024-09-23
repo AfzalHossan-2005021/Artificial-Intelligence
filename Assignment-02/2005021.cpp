@@ -3,12 +3,21 @@
 using namespace std;
 
 const int MAX_DEPTH = 10;
+int heuristic_type;
 
 const int TOTAL_BINS = 14;
 const int INITIAL_STONES = 4;
 
 const int PLAYER_A = 7;
 const int PLAYER_B = 14;
+
+int PLAYER_A_additional_moves = 0;
+int PLAYER_B_additional_moves = 0;
+
+int PLAYER_A_stones_captured = 0;
+int PLAYER_B_stones_captured = 0;
+
+int W1 = 4, W2 = 3, W3 = 2, W4 = 1;
 
 class Mancala;
 
@@ -59,6 +68,11 @@ public:
         if(bin == player && getBinStones(player) > 0){ // last stone in player's storage
             if(manualMove){
                 moveAgain = true;
+                if(player == PLAYER_A){
+                    PLAYER_A_additional_moves++;
+                } else {
+                    PLAYER_B_additional_moves++;
+                }
             } else {
                 move(player, getBestMove(*this, player, depth -1), depth - 1);
             }
@@ -69,6 +83,13 @@ public:
                     oppositeBin -= TOTAL_BINS;
                 }
                 if(board[oppositeBin] > 0){
+                    if(manualMove){
+                        if(player == PLAYER_A){
+                            PLAYER_A_stones_captured += board[oppositeBin];
+                        } else {
+                            PLAYER_B_stones_captured += board[oppositeBin];
+                        }
+                    }
                     board[player] += board[oppositeBin];
                     board[player] += board[bin];
                     board[oppositeBin] = 0;
@@ -101,8 +122,32 @@ public:
     }
 };
 
-int heuristic(Mancala state){
+int heuristic_1(Mancala state){
     return state.getStorageStones(PLAYER_A) - state.getStorageStones(PLAYER_B);
+}
+
+int heuristic_2(Mancala state){
+    return W1 * (state.getStorageStones(PLAYER_A) - state.getStorageStones(PLAYER_B)) + W2 * (state.getBinStones(PLAYER_A) - state.getBinStones(PLAYER_B));
+}
+
+int heuristic_3(Mancala state){
+    return W1 * (state.getStorageStones(PLAYER_A) - state.getStorageStones(PLAYER_B)) + W2 * (state.getBinStones(PLAYER_A) - state.getBinStones(PLAYER_B)) + W3 * (PLAYER_A_additional_moves - PLAYER_B_additional_moves);
+}
+
+int heuristic_4(Mancala state){
+    return W1 * (state.getStorageStones(PLAYER_A) - state.getStorageStones(PLAYER_B)) + W2 * (state.getBinStones(PLAYER_A) - state.getBinStones(PLAYER_B)) + W3 * (PLAYER_A_additional_moves - PLAYER_B_additional_moves) + W4 * (PLAYER_A_stones_captured - PLAYER_B_stones_captured);
+}
+
+int heuristic(Mancala state){
+    if(heuristic_type == 1){
+        return heuristic_1(state);
+    } else if(heuristic_type == 2){
+        return heuristic_2(state);
+    } else if(heuristic_type == 3){
+        return heuristic_3(state);
+    } else {
+        return heuristic_4(state);
+    }
 }
 
 int AdversarialSearch(Mancala state, int player, int alpha, int beta, int depth) {
@@ -171,6 +216,8 @@ int main(){
         cout << "Invalid choice!" << endl;
         return 0;
     }
+    cout << "Enter heuristic type: ";
+    cin >> heuristic_type;
     if(playingMode == 1){ // Player vs Computer
         vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
         initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
