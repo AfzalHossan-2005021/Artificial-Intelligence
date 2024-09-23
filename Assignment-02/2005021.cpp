@@ -2,10 +2,17 @@
 
 using namespace std;
 
+const int MAX_DEPTH = 10;
+
 const int TOTAL_BINS = 14;
+const int INITIAL_STONES = 4;
 
 const int PLAYER_A = 7;
 const int PLAYER_B = 14;
+
+class Mancala;
+
+int getBestMove(Mancala state, int player, int depth = MAX_DEPTH);
 
 class Mancala{
 public:
@@ -156,9 +163,84 @@ int getBestMove(Mancala state, int player, int depth){
 }
 
 int main(){
-    vector<int> board = {0, 4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0};
-    Mancala state(board);
-    state.printBoard();
-    cout << getBestMove(state, PLAYER_A, 5) << endl;
+    int playingMode;
+    cout << "Welcome to Mancala!" << endl;
+    cout << "Playing mode -\n\t1: Player vs Computer\n\t2: Computer vs Computer\n\t3: Suggest best move\nEnter your choice: ";
+    cin >> playingMode;
+    if(playingMode != 1 && playingMode != 2 && playingMode != 3){
+        cout << "Invalid choice!" << endl;
+        return 0;
+    }
+    if(playingMode == 1){ // Player vs Computer
+        vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
+        initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
+        Mancala game(initialState);
+        cout << endl << "Initial board:" << endl;
+        game.printBoard();
+        while(!game.isGameOver()){
+            player_move:
+            int move;
+            cout << "Enter move: ";
+            cin >> move;
+            if(move < 1 || move > 6 || game.isBinEmpty(move)){
+                cout << "Invalid move!" << endl;
+                continue;
+            }
+            game.move(PLAYER_A, move, MAX_DEPTH, true);
+            cout << "After your move: " << move << endl;
+            game.printBoard();
+            if(game.isGameOver()) break;
+            if(game.moveAgain) goto player_move;
+            computer_move:
+            move = getBestMove(game, PLAYER_B);
+            game.move(PLAYER_B, move, MAX_DEPTH, true);
+            cout << "After computer's move: " << move << endl;
+            game.printBoard();
+            cout << endl;
+            if(game.isGameOver()) break;
+            if(game.moveAgain) goto computer_move;
+        }
+        if(game.getStorageStones(PLAYER_A) == game.getStorageStones(PLAYER_B)){
+            cout << "It's a tie!" << endl;
+        } else {
+            cout << "Winner: " << (game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B) ? "You" : "Computer") << endl;
+        }
+    } else if(playingMode == 2){ // Computer vs Computer
+        vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
+        initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
+        Mancala game(initialState);
+        cout << endl << "Initial board:" << endl;
+        game.printBoard();
+        while(!game.isGameOver()){
+            computer1_move:
+            int move = getBestMove(game, PLAYER_A);
+            game.move(PLAYER_A, move, MAX_DEPTH, true);
+            cout << "After computer 1's move: " << move << endl;
+            game.printBoard();
+            cout << endl;
+            if(game.isGameOver()) break;
+            if(game.moveAgain) goto computer1_move;
+            computer2_move:
+            move = getBestMove(game, PLAYER_B);
+            game.move(PLAYER_B, move, MAX_DEPTH, true);
+            cout << "After computer 2's move: " << move << endl;
+            game.printBoard();
+            cout << endl;
+            if(game.isGameOver()) break;
+            if(game.moveAgain) goto computer2_move;
+        }
+        if(game.getStorageStones(PLAYER_A) == game.getStorageStones(PLAYER_B)){
+            cout << "It's a tie!" << endl;
+        } else {
+            cout << "Winner: " << (game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B) ? "Computer 1" : "Computer 2") << endl;
+        }
+    } else { // Suggest best move
+        cout << "Input board state: ";
+        vector<int> boardState(TOTAL_BINS+1);
+        for(int i = 1; i <= TOTAL_BINS; i++){
+            cin >> boardState[i];
+        }
+        cout << "Best move: " << getBestMove(boardState, PLAYER_A, MAX_DEPTH) << endl;
+    }
     return 0;
 }
