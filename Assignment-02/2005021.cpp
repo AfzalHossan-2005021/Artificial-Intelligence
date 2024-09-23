@@ -10,11 +10,13 @@ const int PLAYER_B = 14;
 class Mancala{
 public:
     vector<int> board;
+    bool moveAgain = false;
     Mancala(const vector<int> tmpBoard){
         this->board = tmpBoard;
     }
     Mancala(const Mancala& other) {
         this->board = other.board;
+        this->moveAgain = other.moveAgain;
     }
     int getStorageStones(int player){
         return board[player];
@@ -36,6 +38,7 @@ public:
         if(bin < player - 6 || bin >= player || isBinEmpty(bin)){
             return;
         }
+        moveAgain = false;
         int stones = board[bin];
         board[bin] = 0;
         while(stones > 0){
@@ -47,7 +50,11 @@ public:
             stones--;
         }
         if(bin == player && getBinStones(player) > 0){ // last stone in player's storage
-            // code to move again
+            if(manualMove){
+                moveAgain = true;
+            } else {
+                move(player, getBestMove(*this, player, depth -1), depth - 1);
+            }
         } else if(board[bin] == 1){ // last stone in an empty bin
             if((player == PLAYER_A && bin > 0 && bin < PLAYER_A) || (player == PLAYER_B && bin > PLAYER_A && bin < PLAYER_B)){ // player's side
                 int oppositeBin = 2 * player - bin;
@@ -87,9 +94,71 @@ public:
     }
 };
 
+int heuristic(Mancala state){
+    return state.getStorageStones(PLAYER_A) - state.getStorageStones(PLAYER_B);
+}
+
+int AdversarialSearch(Mancala state, int player, int alpha, int beta, int depth) {
+    if(state.isGameOver() || depth <= 0){
+        return heuristic(state);
+    }
+    if(player == PLAYER_A){
+        int value = INT_MIN;
+        for(int i = player - 6; i < player; i++){
+            if(state.isBinEmpty(i)) continue;
+            Mancala childState = state;
+            childState.move(player, i, depth);
+            value = max(value, AdversarialSearch(childState, PLAYER_B, alpha, beta, depth - 1));
+            if(value > beta) break;
+            alpha = max(alpha, value);
+        }
+        return value;
+    } else {
+        int value = INT_MAX;
+        for(int i = player - 6; i < player; i++){
+            if(state.isBinEmpty(i)) continue;
+            Mancala childState = state;
+            childState.move(player, i, depth);
+            value = min(value, AdversarialSearch(childState, PLAYER_A, alpha, beta, depth - 1));
+            if(value < alpha) break;
+            beta = min(beta, value);
+        }
+        return value;
+    }
+}
+
+int getBestMove(Mancala state, int player, int depth){
+    int bestMove = -1, alpha = INT_MIN, beta = INT_MAX;
+    if(player == PLAYER_A){
+        for(int i = player - 6; i < player; i++){
+            if(state.isBinEmpty(i)) continue;
+            Mancala nextState = state;
+            nextState.move(player, i, depth);
+            int value = AdversarialSearch(nextState, PLAYER_B, alpha, beta, depth - 1);
+            if(value > alpha){
+                alpha = value;
+                bestMove = i;
+            }
+        }
+    } else {
+        for(int i = player - 6; i < player; i++){
+            if(state.isBinEmpty(i)) continue;
+            Mancala nextState = state;
+            nextState.move(player, i, depth);
+            int value = AdversarialSearch(nextState, PLAYER_A, alpha, beta, depth - 1);
+            if(value < beta){
+                beta = value;
+                bestMove = i;
+            }
+        }
+    }
+    return bestMove;
+}
+
 int main(){
     vector<int> board = {0, 4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0};
     Mancala state(board);
     state.printBoard();
+    cout << getBestMove(state, PLAYER_A, 5) << endl;
     return 0;
 }
