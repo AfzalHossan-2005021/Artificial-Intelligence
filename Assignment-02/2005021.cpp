@@ -46,6 +46,29 @@ public:
             board[bin]++;
             stones--;
         }
+        if(bin == player && getBinStones(player) > 0){ // last stone in player's storage
+            // code to move again
+        } else if(board[bin] == 1){ // last stone in an empty bin
+            if((player == PLAYER_A && bin > 0 && bin < PLAYER_A) || (player == PLAYER_B && bin > PLAYER_A && bin < PLAYER_B)){ // player's side
+                int oppositeBin = 2 * player - bin;
+                if(oppositeBin > TOTAL_BINS){
+                    oppositeBin -= TOTAL_BINS;
+                }
+                if(board[oppositeBin] > 0){
+                    board[player] += board[oppositeBin];
+                    board[player] += board[bin];
+                    board[oppositeBin] = 0;
+                    board[bin] = 0;
+                }
+            }
+        }
+        if(getBinStones(player) == 0){
+            int opponent = (player == PLAYER_A ? PLAYER_B : PLAYER_A);
+            board[opponent] += getBinStones(opponent);
+            for(int i = opponent - 6; i < opponent; i++){
+                board[i] = 0;
+            }
+        }
     }
     void printBoard(){
         for(int i = 13; i >= 8; i--){
