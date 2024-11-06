@@ -2,7 +2,7 @@
 
 using namespace std;
 
-const int MAX_DEPTH = 10;
+int MAX_DEPTH = 10;
 int heuristic_type;
 
 const int TOTAL_BINS = 14;
@@ -21,7 +21,7 @@ int W1 = 4, W2 = 3, W3 = 2, W4 = 1;
 
 class Mancala;
 
-int getBestMove(Mancala state, int player, int depth = MAX_DEPTH);
+int getBestMove(Mancala state, int player, bool bothComputer, int depth = MAX_DEPTH);
 
 class Mancala{
 public:
@@ -74,7 +74,7 @@ public:
                     PLAYER_B_additional_moves++;
                 }
             } else {
-                move(player, getBestMove(*this, player, depth -1), depth - 1);
+                move(player, getBestMove(*this, player, false, depth -1), depth - 1);
             }
         } else if(board[bin] == 1){ // last stone in an empty bin
             if((player == PLAYER_A && bin > 0 && bin < PLAYER_A) || (player == PLAYER_B && bin > PLAYER_A && bin < PLAYER_B)){ // player's side
@@ -179,7 +179,7 @@ int AdversarialSearch(Mancala state, int player, int alpha, int beta, int depth)
     }
 }
 
-int getBestMove(Mancala state, int player, int depth){
+int getBestMove(Mancala state, int player, bool bothComputer, int depth){
     int bestMove = -1, alpha = INT_MIN, beta = INT_MAX;
     if(player == PLAYER_A){
         for(int i = player - 6; i < player; i++){
@@ -193,14 +193,16 @@ int getBestMove(Mancala state, int player, int depth){
             }
         }
     } else {
-        for(int i = player - 6; i < player; i++){
-            if(state.isBinEmpty(i)) continue;
+        int moves[6] = {8, 9, 10, 11, 12, 13};
+        random_shuffle(moves, moves + 6);
+        for(int i = 0; i < 6; i++){
+            if(state.isBinEmpty(moves[i])) continue;
             Mancala nextState = state;
-            nextState.move(player, i, depth);
+            nextState.move(player, moves[i], depth);
             int value = AdversarialSearch(nextState, PLAYER_A, alpha, beta, depth - 1);
             if(value < beta){
                 beta = value;
-                bestMove = i;
+                bestMove = moves[i];
             }
         }
     }
@@ -218,6 +220,27 @@ int main(){
     }
     cout << "Enter heuristic type: ";
     cin >> heuristic_type;
+    if(heuristic_type < 1 || heuristic_type > 4){
+        cout << "Invalid heuristic type!" << endl;
+        return 0;
+    }
+    if(heuristic_type > 1){
+        cout << "Enter weights W1: ";
+        cin >> W1;
+        cout << "Enter weights W2: ";
+        cin >> W2;
+    }
+    if(heuristic_type > 2){
+        cout << "Enter weights W3: ";
+        cin >> W3;
+    }
+    if(heuristic_type > 3){
+        cout << "Enter weights W4: ";
+        cin >> W4;
+    }
+    cout << "Enter depth (More than 10 will take too long): ";
+    cin >> MAX_DEPTH;
+
     if(playingMode == 1){ // Player vs Computer
         vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
         initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
@@ -239,7 +262,7 @@ int main(){
             if(game.isGameOver()) break;
             if(game.moveAgain) goto player_move;
             computer_move:
-            move = getBestMove(game, PLAYER_B);
+            move = getBestMove(game, PLAYER_B, false);
             game.move(PLAYER_B, move, MAX_DEPTH, true);
             cout << "After computer's move: " << move << endl;
             game.printBoard();
@@ -253,41 +276,62 @@ int main(){
             cout << "Winner: " << (game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B) ? "You" : "Computer") << endl;
         }
     } else if(playingMode == 2){ // Computer vs Computer
-        vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
-        initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
-        Mancala game(initialState);
-        cout << endl << "Initial board:" << endl;
-        game.printBoard();
-        while(!game.isGameOver()){
-            computer1_move:
-            int move = getBestMove(game, PLAYER_A);
-            game.move(PLAYER_A, move, MAX_DEPTH, true);
-            cout << "After computer 1's move: " << move << endl;
+        int totalGames;
+        cout << "Enter total games: ";
+        cin >> totalGames;
+        int computer1Wins = 0, computer2Wins = 0, ties = 0;
+        for(int i = 0; i < totalGames; i++){
+            vector<int> initialState(TOTAL_BINS+1, INITIAL_STONES);
+            initialState[PLAYER_A] = initialState[PLAYER_B] = 0;
+            Mancala game(initialState);
+            cout << endl << "Game " << i+1 << ":" << endl;
+            cout << endl << "Initial board:" << endl;
             game.printBoard();
-            cout << endl;
-            if(game.isGameOver()) break;
-            if(game.moveAgain) goto computer1_move;
-            computer2_move:
-            move = getBestMove(game, PLAYER_B);
-            game.move(PLAYER_B, move, MAX_DEPTH, true);
-            cout << "After computer 2's move: " << move << endl;
-            game.printBoard();
-            cout << endl;
-            if(game.isGameOver()) break;
-            if(game.moveAgain) goto computer2_move;
+            while(!game.isGameOver()){
+                computer1_move:
+                int move = getBestMove(game, PLAYER_A, true);
+                game.move(PLAYER_A, move, MAX_DEPTH, true);
+                cout << "After computer 1's move: " << move << endl;
+                game.printBoard();
+                cout << endl;
+                if(game.isGameOver()) break;
+                if(game.moveAgain) goto computer1_move;
+                computer2_move:
+                move = getBestMove(game, PLAYER_B, true);
+                game.move(PLAYER_B, move, MAX_DEPTH, true);
+                cout << "After computer 2's move: " << move << endl;
+                game.printBoard();
+                cout << endl;
+                if(game.isGameOver()) break;
+                if(game.moveAgain) goto computer2_move;
+            }
+            if(game.getStorageStones(PLAYER_A) < game.getStorageStones(PLAYER_B)){
+                computer2Wins++;
+            } else if(game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B)){
+                computer1Wins++;
+            } else {
+                ties++;
+            }
+            if(game.getStorageStones(PLAYER_A) == game.getStorageStones(PLAYER_B)){
+                cout << "It's a tie!" << endl;
+            } else {
+                cout << "Winner: " << (game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B) ? "Computer 1" : "Computer 2") << endl;
+            }
         }
-        if(game.getStorageStones(PLAYER_A) == game.getStorageStones(PLAYER_B)){
-            cout << "It's a tie!" << endl;
-        } else {
-            cout << "Winner: " << (game.getStorageStones(PLAYER_A) > game.getStorageStones(PLAYER_B) ? "Computer 1" : "Computer 2") << endl;
-        }
+        cout << endl << "Results:" << endl;
+        cout << "Computer 1 wins: " << computer1Wins << endl;
+        cout << "Computer 2 wins: " << computer2Wins << endl;
+        cout << "Ties: " << ties << endl;
     } else { // Suggest best move
-        cout << "Input board state: ";
-        vector<int> boardState(TOTAL_BINS+1);
-        for(int i = 1; i <= TOTAL_BINS; i++){
-            cin >> boardState[i];
+        while(true){
+            cout << "Input board state(Enter -1 to exit): ";
+            vector<int> boardState(TOTAL_BINS+1);
+            for(int i = 1; i <= TOTAL_BINS; i++){
+                cin >> boardState[i];
+                if(boardState[i] == -1) return 0;
+            }
+            cout << "Best move: " << getBestMove(boardState, PLAYER_A, MAX_DEPTH) << endl;
         }
-        cout << "Best move: " << getBestMove(boardState, PLAYER_A, MAX_DEPTH) << endl;
     }
     return 0;
 }
