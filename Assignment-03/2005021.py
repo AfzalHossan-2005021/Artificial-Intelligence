@@ -29,6 +29,52 @@ def read_tsp_file(filename):
             cities.append((float(city[1]), float(city[2]), int(city[0]) - 1))
 
         return cities
+    
+
+# Function to convert a list of edges to a tour
+def edges_to_tour(edges):
+    # Step 1: Create a mapping from each node_id to its neighbors
+    connections = {}
+    for (node1, node2) in edges:
+        id1, id2 = node1[2], node2[2]  # Extract node ids
+        if id1 not in connections:
+            connections[id1] = []
+        if id2 not in connections:
+            connections[id2] = []
+        connections[id1].append(id2)
+        connections[id2].append(id1)
+    
+     # Step 2: Find the starting node (a node with only one connection)
+    start_node = None
+    for node, neighbors in connections.items():
+        if len(neighbors) == 1:  # Node has only one neighbor, so it’s an endpoint of an open path
+            start_node = node
+            break
+    if start_node is None:
+        # If no node with only one connection is found, pick any node to start (suitable for closed loops)
+        start_node = next(iter(connections))
+
+    # Step 3: Build the tour by following connections
+    tour = [start_node]
+    current_node = start_node
+    prev_node = None
+    
+    while True:
+        # Get neighbors of the current node
+        neighbors = connections[current_node]
+        # Choose the next node that isn't the previous node
+        next_node = neighbors[0] if neighbors[0] != prev_node else neighbors[1]
+        # Stop if we've returned to the start in a closed loop
+        if next_node == start_node:
+            break
+        tour.append(next_node)
+        # Update prev_node and current_node
+        prev_node, current_node = current_node, next_node
+        # Stop if there are no more unvisited neighbors (for open paths)
+        if len(connections[current_node]) == 1:
+            break
+    
+    return tour
 
 
 ################################################ Nearest Neighbour Heuristic ################################################
@@ -180,7 +226,8 @@ def main():
             cities = read_tsp_file(os.path.join(directory, file))
             print("Number of Cities: ", len(cities))
             selected_edges = greedy_heuristic(cities)
-            print("Selected Edges: ", selected_edges)
+            tour = edges_to_tour(selected_edges)
+            print("Tour: ", tour)
             
 
 # call the main function
