@@ -8,6 +8,11 @@ def distance(city1, city2):
     return math.sqrt((city1[0] - city2[0])**2 + (city1[1] - city2[1])**2)
 
 
+# Function to calculate the distance between two nodes
+def tour_distance(tour, distance_matrix):
+    return sum(distance_matrix[tour[i]][tour[i+1]] for i in range(len(tour)-1)) + distance_matrix[tour[-1]][tour[0]]
+
+
 # Function to read a .tsp file and return the number of cities and the average distance between cities
 def read_tsp_file(filename):
     with open(filename, 'r') as file:
@@ -29,6 +34,52 @@ def read_tsp_file(filename):
             cities.append((float(city[1]), float(city[2]), int(city[0]) - 1))
 
         return cities
+    
+
+# Function to convert a list of edges to a tour
+def edges_to_tour(edges):
+    # Step 1: Create a mapping from each node_id to its neighbors
+    connections = {}
+    for (node1, node2) in edges:
+        id1, id2 = node1[2], node2[2]  # Extract node ids
+        if id1 not in connections:
+            connections[id1] = []
+        if id2 not in connections:
+            connections[id2] = []
+        connections[id1].append(id2)
+        connections[id2].append(id1)
+    
+     # Step 2: Find the starting node (a node with only one connection)
+    start_node = None
+    for node, neighbors in connections.items():
+        if len(neighbors) == 1:  # Node has only one neighbor, so it’s an endpoint of an open path
+            start_node = node
+            break
+    if start_node is None:
+        # If no node with only one connection is found, pick any node to start (suitable for closed loops)
+        start_node = next(iter(connections))
+
+    # Step 3: Build the tour by following connections
+    tour = [start_node]
+    current_node = start_node
+    prev_node = None
+    
+    while True:
+        # Get neighbors of the current node
+        neighbors = connections[current_node]
+        # Choose the next node that isn't the previous node
+        next_node = neighbors[0] if neighbors[0] != prev_node else neighbors[1]
+        # Stop if we've returned to the start in a closed loop
+        if next_node == start_node:
+            break
+        tour.append(next_node)
+        # Update prev_node and current_node
+        prev_node, current_node = current_node, next_node
+        # Stop if there are no more unvisited neighbors (for open paths)
+        if len(connections[current_node]) == 1:
+            break
+    
+    return tour
 
 
 ################################################ Nearest Neighbour Heuristic ################################################
@@ -108,6 +159,203 @@ def insertion_heuristic(cities):
     return selected_edges
 
 
+###################################################### Greedy Heuristic #####################################################
+#   Step 1. Sort all the edges in non-decreasing order of their weights.                                                    #
+#   Step 2. Pick the smallest edge. Check if it results in any vertices of degree greater than two. If not, then include    #
+#           this edge. Otherwise, discard it.                                                                               #
+#   Step 3. Repeat Step 2 until there are (V-1) edges in the spanning tree.                                                 #
+#############################################################################################################################
+def greedy_heuristic(cities):
+    # list all the edges
+    all_edges = []
+    for i in range(len(cities)):
+        for j in range(i+1, len(cities)):
+            all_edges.append((cities[i], cities[j], distance(cities[i], cities[j])))
+
+    # sort the edges based on the distance
+    all_edges.sort(key=lambda edge: edge[2])
+
+    # keep track of the degree of each city
+    degree = [0] * (len(cities) + 1)
+
+    # keep track of the neighbors of each city
+    neighbors = {i: [] for i in range(len(cities) + 1)}
+
+    # list to store the selected edges
+    selected_edges = []
+
+    def detect_path(start, target, visited=None):
+        if visited is None:
+            visited = set()
+        visited.add(start)
+        for neighbor in neighbors[start]:
+            if neighbor == target and len(visited) < len(cities):
+                return True
+            if neighbor not in visited:
+                if detect_path(neighbor, target, visited):
+                    return True
+        return False
+    
+    for edge in all_edges:
+        city1_id, city2_id = edge[0][2], edge[1][2]
+        if degree[city1_id] < 2 and degree[city2_id] < 2:
+            if not detect_path(city1_id, city2_id):
+                neighbors[city1_id].append(city2_id)
+                neighbors[city2_id].append(city1_id)
+                degree[city1_id] += 1
+                degree[city2_id] += 1
+                selected_edges.append((edge[0], edge[1]))
+
+            if len(selected_edges) == len(cities):
+                break
+
+    return selected_edges
+
+
+###################################################### 2-opt Heuristic ######################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. Select two edges from the tour.                                                                                 #
+#   Step 3. Remove the two edges from the tour.                                                                             #
+#   Step 4. Add the two new edges to the tour.                                                                              #
+#   Step 5. If the new tour is shorter than the previous tour, then accept the new tour.                                    #
+#############################################################################################################################
+def two_opt(tour, distance_matrix):
+    def gain_from_two_opt(X1, X2, Y1, Y2):
+        del_length = distance_matrix[X1][X2] + distance_matrix[Y1][Y2]
+        add_length = distance_matrix[X1][Y1] + distance_matrix[X2][Y2]
+        return del_length - add_length
+    
+    N = len(tour)
+    optimal_tour = tour
+    optimal_distance = tour_distance(tour, distance_matrix)
+    local_optimal = False
+    loop_iter_count = 0
+    while not local_optimal:
+        local_optimal = True
+        loop_iter_count += 1
+        for i in range(N - 2):
+            X1 = tour[i]
+            X2 = tour[i + 1]
+            for j in range(i + 2, N - (i == 0)):
+                Y1 = tour[j]
+                Y2 = tour[(j + 1) % N]
+                if gain_from_two_opt(X1, X2, Y1, Y2) >= 0.5:
+                    tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                    new_distance = tour_distance(tour, distance_matrix)
+                    local_optimal = False
+                    if new_distance < optimal_distance:
+                        optimal_tour = tour
+                        optimal_distance = new_distance
+
+        if loop_iter_count >= N:
+            break
+
+    return optimal_tour, optimal_distance
+
+
+######################################################## Node Shift #########################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. For each city in the tour, check if the tour can be improved by shifting the city to a different position.      #
+#   Step 3. If the tour can be improved, then shift the city to the new position.                                           #
+#############################################################################################################################
+def node_shift(tour, distance_matrix):
+
+    def gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2):
+        del_length = distance_matrix[X0_pred][X0] + distance_matrix[X0][X0_succ] + distance_matrix[Y1][Y2]
+        add_length = distance_matrix[X0_pred][X0_succ] + distance_matrix[Y1][X0] + distance_matrix[X0][Y2]
+        return del_length - add_length
+
+    N = len(tour)
+    locally_optimal = False
+    loop_iter_count = 0
+
+    while not locally_optimal:
+        locally_optimal = True
+        loop_iter_count += 1
+
+        for counter_1 in range(N):
+            i = counter_1
+            X0_pred = tour[(i + N - 1) % N]
+            X0 = tour[i]
+            X0_succ = tour[(i + 1) % N]
+
+            for counter_2 in range(1, N - 1):
+                j = (i + counter_2) % N
+                Y1 = tour[j]
+                Y2 = tour[(j + 1) % N]
+
+                if gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2) >= 0.5:
+                    shift_size = (j - i + 1 + N) % N
+                    left = i
+                    for _ in range(shift_size):
+                        right = (left + 1) % N
+                        tour[left] = tour[right]
+                        left = right
+                    tour[j] = X0
+                    locally_optimal = False
+
+        if loop_iter_count >= N:
+            break
+            
+    return tour, tour_distance(tour, distance_matrix)
+
+
+######################################################### Node Swap #########################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. For each pair of cities in the tour, check if the tour can be improved by swapping the cities.                  #
+#   Step 3. If the tour can be improved, then swap the cities.                                                              #
+#############################################################################################################################
+def node_swap(tour, distance_matrix):
+    def gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ):
+        if X0 == Y0:
+            return 0
+        if Y0 == X0_succ or X0_succ == Y0_pred:
+            del_Length = distance_matrix[X0_pred][X0] + distance_matrix[Y0][Y0_succ]
+            add_Length = distance_matrix[X0_pred][Y0] + distance_matrix[X0][Y0_succ]
+            return del_Length - add_Length
+        elif X0 == Y0_succ or Y0_succ == X0_pred:
+            del_Length = distance_matrix[Y0_pred][Y0] + distance_matrix[X0][X0_succ]
+            add_Length = distance_matrix[Y0_pred][X0] + distance_matrix[Y0][X0_succ]
+            return del_Length - add_Length
+        else:
+            del_length = distance_matrix[X0_pred][X0] + distance_matrix[X0][X0_succ] + distance_matrix[Y0_pred][Y0] + distance_matrix[Y0][Y0_succ]
+            add_length = distance_matrix[X0_pred][Y0] + distance_matrix[Y0][X0_succ] + distance_matrix[Y0_pred][X0] + distance_matrix[X0][Y0_succ]
+            return del_length - add_length
+    
+    N = len(tour)
+    local_optimal = False
+    loop_iter_count = 0
+    optimal_tour = tour
+    optimal_distance = tour_distance(tour, distance_matrix)
+
+    while not local_optimal:
+        local_optimal = True
+        loop_iter_count += 1
+
+        for i in range(N):
+            X0_pred = tour[(i + N - 1) % N]
+            X0 = tour[i]
+            X0_succ = tour[(i + 1) % N]
+
+            for j in range(i+1, N):
+                Y0_pred = tour[(j + N - 1) % N]
+                Y0 = tour[j]
+                Y0_succ = tour[(j + 1) % N]
+
+                if gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ) >= 0.5:
+                    tour[i], tour[j] = tour[j], tour[i]
+                    local_optimal = False
+                    new_distance = tour_distance(tour, distance_matrix)
+                    if new_distance < optimal_distance:
+                        optimal_tour = tour[:]
+                        optimal_distance = new_distance
+
+        if loop_iter_count >= N:
+            break
+
+    return optimal_tour, optimal_distance
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -126,8 +374,12 @@ def main():
             print("File Name: ", file)
             cities = read_tsp_file(os.path.join(directory, file))
             print("Number of Cities: ", len(cities))
-            selected_edges = insertion_heuristic(cities)
-            print("Selected Edges: ", selected_edges)
+            selected_edges = greedy_heuristic(cities)
+            tour = edges_to_tour(selected_edges)
+            distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
+            print("Initial distance: ", tour_distance(tour, distance_matrix))
+            optimized_tour, optimized_distance = node_swap(tour, distance_matrix)
+            print("Optimized distance:", optimized_distance)
             
 
 # call the main function
