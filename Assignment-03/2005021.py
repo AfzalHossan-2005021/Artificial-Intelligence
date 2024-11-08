@@ -1,5 +1,7 @@
 import os
+import csv
 import math
+import time
 import random
 
 
@@ -366,20 +368,29 @@ def main():
     # get the list of files in the directory
     files = os.listdir(directory)
 
-    # read each file and store the results
-    for file in files:
-        # check if the file is a .tsp file
-        if file.endswith('.tsp'):
-            # read the file
-            print("File Name: ", file)
-            cities = read_tsp_file(os.path.join(directory, file))
-            print("Number of Cities: ", len(cities))
-            selected_edges = greedy_heuristic(cities)
-            tour = edges_to_tour(selected_edges)
-            distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
-            print("Initial distance: ", tour_distance(tour, distance_matrix))
-            optimized_tour, optimized_distance = node_swap(tour, distance_matrix)
-            print("Optimized distance:", optimized_distance)
+    constructive_search_methods = [nearest_neighbour, insertion_heuristic, greedy_heuristic]
+    perturbative_search_methods = [two_opt, node_shift, node_swap]
+
+    with open("output_table.csv", mode="w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["File Name", "Number of Cities", "Constructive Heuristic", "Perturbative Heuristic", "Initial Distance", "Optimized Distance", "Initial Time (ms)", "Final Time (ms)"])
+        for file in files:
+            if file.endswith('.tsp'):
+                cities = read_tsp_file(os.path.join(directory, file))
+                distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
+                for constructive_search_method in constructive_search_methods:
+                    start_time = time.time()
+                    selected_edges = constructive_search_method(cities)
+                    end_time = time.time()
+                    tour = edges_to_tour(selected_edges)
+                    initial_distance = tour_distance(tour, distance_matrix)
+                    initial_time = (end_time - start_time) * 1000
+                    for perturbative_search_method in perturbative_search_methods:
+                        start_time = time.time()
+                        optimized_tour, optimized_distance = perturbative_search_method(tour, distance_matrix)
+                        end_time = time.time()
+                        final_time = (end_time - start_time) * 1000
+                        writer.writerow([file, len(cities), constructive_search_method.__name__, perturbative_search_method.__name__, initial_distance, optimized_distance, initial_time, final_time])
             
 
 # call the main function
