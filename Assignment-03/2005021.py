@@ -8,6 +8,11 @@ def distance(city1, city2):
     return math.sqrt((city1[0] - city2[0])**2 + (city1[1] - city2[1])**2)
 
 
+# Function to calculate the distance between two nodes
+def tour_distance(tour, distance_matrix):
+    return sum(distance_matrix[tour[i]][tour[i+1]] for i in range(len(tour)-1)) + distance_matrix[tour[-1]][tour[0]]
+
+
 # Function to read a .tsp file and return the number of cities and the average distance between cities
 def read_tsp_file(filename):
     with open(filename, 'r') as file:
@@ -207,6 +212,47 @@ def greedy_heuristic(cities):
     return selected_edges
 
 
+###################################################### 2-opt Heuristic ######################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. Select two edges from the tour.                                                                                 #
+#   Step 3. Remove the two edges from the tour.                                                                             #
+#   Step 4. Add the two new edges to the tour.                                                                              #
+#   Step 5. If the new tour is shorter than the previous tour, then accept the new tour.                                    #
+#############################################################################################################################
+def two_opt(tour, distance_matrix):
+    def gain_from_two_opt(X1, X2, Y1, Y2):
+        del_length = distance_matrix[X1][X2] + distance_matrix[Y1][Y2]
+        add_length = distance_matrix[X1][Y1] + distance_matrix[X2][Y2]
+        return del_length - add_length
+    
+    N = len(tour)
+    optimal_tour = tour
+    optimal_distance = tour_distance(tour, distance_matrix)
+    local_optimal = False
+    loop_iter_count = 0
+    while not local_optimal:
+        local_optimal = True
+        loop_iter_count += 1
+        for i in range(N - 2):
+            X1 = tour[i]
+            X2 = tour[i + 1]
+            for j in range(i + 2, N - (i == 0)):
+                Y1 = tour[j]
+                Y2 = tour[(j + 1) % N]
+                if gain_from_two_opt(X1, X2, Y1, Y2) >= 0.5:
+                    tour[i+1:j+1] = tour[i+1:j+1][::-1]
+                    new_distance = tour_distance(tour, distance_matrix)
+                    local_optimal = False
+                    if new_distance < optimal_distance:
+                        optimal_tour = tour
+                        optimal_distance = new_distance
+
+        if loop_iter_count >= N:
+            break
+
+    return optimal_tour, optimal_distance
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -227,7 +273,10 @@ def main():
             print("Number of Cities: ", len(cities))
             selected_edges = greedy_heuristic(cities)
             tour = edges_to_tour(selected_edges)
-            print("Tour: ", tour)
+            distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
+            print("Initial distance: ", tour_distance(tour, distance_matrix))
+            optimized_tour, optimized_distance = two_opt(tour, distance_matrix)
+            print("Optimized distance:", optimized_distance)
             
 
 # call the main function
