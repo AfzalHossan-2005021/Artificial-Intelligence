@@ -108,6 +108,59 @@ def insertion_heuristic(cities):
     return selected_edges
 
 
+###################################################### Greedy Heuristic #####################################################
+#   Step 1. Sort all the edges in non-decreasing order of their weights.                                                    #
+#   Step 2. Pick the smallest edge. Check if it results in any vertices of degree greater than two. If not, then include    #
+#           this edge. Otherwise, discard it.                                                                               #
+#   Step 3. Repeat Step 2 until there are (V-1) edges in the spanning tree.                                                 #
+#############################################################################################################################
+def greedy_heuristic(cities):
+    # list all the edges
+    all_edges = []
+    for i in range(len(cities)):
+        for j in range(i+1, len(cities)):
+            all_edges.append((cities[i], cities[j], distance(cities[i], cities[j])))
+
+    # sort the edges based on the distance
+    all_edges.sort(key=lambda edge: edge[2])
+
+    # keep track of the degree of each city
+    degree = [0] * (len(cities) + 1)
+
+    # keep track of the neighbors of each city
+    neighbors = {i: [] for i in range(len(cities) + 1)}
+
+    # list to store the selected edges
+    selected_edges = []
+
+    def detect_path(start, target, visited=None):
+        if visited is None:
+            visited = set()
+        visited.add(start)
+        for neighbor in neighbors[start]:
+            if neighbor == target and len(visited) < len(cities):
+                return True
+            if neighbor not in visited:
+                if detect_path(neighbor, target, visited):
+                    return True
+        return False
+    
+    for edge in all_edges:
+        city1_id, city2_id = edge[0][2], edge[1][2]
+        if degree[city1_id] < 2 and degree[city2_id] < 2:
+            if not detect_path(city1_id, city2_id):
+                neighbors[city1_id].append(city2_id)
+                neighbors[city2_id].append(city1_id)
+                degree[city1_id] += 1
+                degree[city2_id] += 1
+                selected_edges.append((edge[0], edge[1]))
+
+            if len(selected_edges) == len(cities):
+                break
+
+    return selected_edges
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -126,7 +179,7 @@ def main():
             print("File Name: ", file)
             cities = read_tsp_file(os.path.join(directory, file))
             print("Number of Cities: ", len(cities))
-            selected_edges = insertion_heuristic(cities)
+            selected_edges = greedy_heuristic(cities)
             print("Selected Edges: ", selected_edges)
             
 
