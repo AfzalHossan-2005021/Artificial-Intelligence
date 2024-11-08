@@ -65,6 +65,49 @@ def nearest_neighbour(cities):
     return selected_edges
 
 
+######################################### Insertion Heuristics (Cheapest Neighbour) #########################################
+#   Step 1. Start with a sub-graph consisting of node i only.                                                               #
+#   Step 2. Find node r such that cir is minimal and form sub-tour i-r-i.                                                   #
+#   Step 3. Find (i, j) in sub-tour and r not, such that cir + crj - cij is minimal. Insert r between i and j.              #
+#############################################################################################################################
+def insertion_heuristic(cities):
+    # list to store the visited cities
+    visited = []
+    # list to store the unvisited cities
+    unvisited = cities.copy()
+    # first add a random city to the visited list
+    rand_num = random.randint(0, len(unvisited)-1)
+    initial_city = unvisited.pop(rand_num)
+    visited.append(initial_city)
+
+    # find the nearest city to the first city, add it to the visited list and form a sub-tour
+    nearest_city = min(unvisited, key=lambda city: distance(initial_city, city))
+    visited.append(nearest_city)
+    unvisited.remove(nearest_city)
+    visited.append(initial_city)
+
+    # insert city r into the sub-tour
+    while unvisited:
+        min_cost = math.inf
+        for city in unvisited:
+            for i in range(1, len(visited)):
+                cost = distance(visited[i-1], city) + distance(city, visited[i]) - distance(visited[i-1], visited[i])
+                if cost < min_cost:
+                    min_cost = cost
+                    min_city = city
+                    min_index = i
+
+        visited.insert(min_index, min_city)
+        unvisited.remove(min_city)
+
+    # convert the tour to edge list
+    selected_edges = []
+    for i in range(len(visited)-1):
+        selected_edges.append((visited[i], visited[i+1]))
+
+    return selected_edges
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -83,7 +126,7 @@ def main():
             print("File Name: ", file)
             cities = read_tsp_file(os.path.join(directory, file))
             print("Number of Cities: ", len(cities))
-            selected_edges = nearest_neighbour(cities)
+            selected_edges = insertion_heuristic(cities)
             print("Selected Edges: ", selected_edges)
             
 
