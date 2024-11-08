@@ -300,6 +300,62 @@ def node_shift(tour, distance_matrix):
     return tour, tour_distance(tour, distance_matrix)
 
 
+######################################################### Node Swap #########################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. For each pair of cities in the tour, check if the tour can be improved by swapping the cities.                  #
+#   Step 3. If the tour can be improved, then swap the cities.                                                              #
+#############################################################################################################################
+def node_swap(tour, distance_matrix):
+    def gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ):
+        if X0 == Y0:
+            return 0
+        if Y0 == X0_succ or X0_succ == Y0_pred:
+            del_Length = distance_matrix[X0_pred][X0] + distance_matrix[Y0][Y0_succ]
+            add_Length = distance_matrix[X0_pred][Y0] + distance_matrix[X0][Y0_succ]
+            return del_Length - add_Length
+        elif X0 == Y0_succ or Y0_succ == X0_pred:
+            del_Length = distance_matrix[Y0_pred][Y0] + distance_matrix[X0][X0_succ]
+            add_Length = distance_matrix[Y0_pred][X0] + distance_matrix[Y0][X0_succ]
+            return del_Length - add_Length
+        else:
+            del_length = distance_matrix[X0_pred][X0] + distance_matrix[X0][X0_succ] + distance_matrix[Y0_pred][Y0] + distance_matrix[Y0][Y0_succ]
+            add_length = distance_matrix[X0_pred][Y0] + distance_matrix[Y0][X0_succ] + distance_matrix[Y0_pred][X0] + distance_matrix[X0][Y0_succ]
+            return del_length - add_length
+    
+    N = len(tour)
+    local_optimal = False
+    loop_iter_count = 0
+    optimal_tour = tour
+    optimal_distance = tour_distance(tour, distance_matrix)
+
+    while not local_optimal:
+        local_optimal = True
+        loop_iter_count += 1
+
+        for i in range(N):
+            X0_pred = tour[(i + N - 1) % N]
+            X0 = tour[i]
+            X0_succ = tour[(i + 1) % N]
+
+            for j in range(i+1, N):
+                Y0_pred = tour[(j + N - 1) % N]
+                Y0 = tour[j]
+                Y0_succ = tour[(j + 1) % N]
+
+                if gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ) >= 0.5:
+                    tour[i], tour[j] = tour[j], tour[i]
+                    local_optimal = False
+                    new_distance = tour_distance(tour, distance_matrix)
+                    if new_distance < optimal_distance:
+                        optimal_tour = tour[:]
+                        optimal_distance = new_distance
+
+        if loop_iter_count >= N:
+            break
+
+    return optimal_tour, optimal_distance
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -322,7 +378,7 @@ def main():
             tour = edges_to_tour(selected_edges)
             distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
             print("Initial distance: ", tour_distance(tour, distance_matrix))
-            optimized_tour, optimized_distance = node_shift(tour, distance_matrix)
+            optimized_tour, optimized_distance = node_swap(tour, distance_matrix)
             print("Optimized distance:", optimized_distance)
             
 
