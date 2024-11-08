@@ -253,6 +253,53 @@ def two_opt(tour, distance_matrix):
     return optimal_tour, optimal_distance
 
 
+######################################################## Node Shift #########################################################
+#   Step 1. Start with a random tour.                                                                                       #
+#   Step 2. For each city in the tour, check if the tour can be improved by shifting the city to a different position.      #
+#   Step 3. If the tour can be improved, then shift the city to the new position.                                           #
+#############################################################################################################################
+def node_shift(tour, distance_matrix):
+
+    def gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2):
+        del_length = distance_matrix[X0_pred][X0] + distance_matrix[X0][X0_succ] + distance_matrix[Y1][Y2]
+        add_length = distance_matrix[X0_pred][X0_succ] + distance_matrix[Y1][X0] + distance_matrix[X0][Y2]
+        return del_length - add_length
+
+    N = len(tour)
+    locally_optimal = False
+    loop_iter_count = 0
+
+    while not locally_optimal:
+        locally_optimal = True
+        loop_iter_count += 1
+
+        for counter_1 in range(N):
+            i = counter_1
+            X0_pred = tour[(i + N - 1) % N]
+            X0 = tour[i]
+            X0_succ = tour[(i + 1) % N]
+
+            for counter_2 in range(1, N - 1):
+                j = (i + counter_2) % N
+                Y1 = tour[j]
+                Y2 = tour[(j + 1) % N]
+
+                if gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2) >= 0.5:
+                    shift_size = (j - i + 1 + N) % N
+                    left = i
+                    for _ in range(shift_size):
+                        right = (left + 1) % N
+                        tour[left] = tour[right]
+                        left = right
+                    tour[j] = X0
+                    locally_optimal = False
+
+        if loop_iter_count >= N:
+            break
+            
+    return tour, tour_distance(tour, distance_matrix)
+
+
 ####################################################### Main Function #######################################################
 # Function to read all the .tsp files in the directory and store the results
 def main():
@@ -275,7 +322,7 @@ def main():
             tour = edges_to_tour(selected_edges)
             distance_matrix = [[distance(cities[i], cities[j]) for j in range(len(cities))] for i in range(len(cities))]
             print("Initial distance: ", tour_distance(tour, distance_matrix))
-            optimized_tour, optimized_distance = two_opt(tour, distance_matrix)
+            optimized_tour, optimized_distance = node_shift(tour, distance_matrix)
             print("Optimized distance:", optimized_distance)
             
 
