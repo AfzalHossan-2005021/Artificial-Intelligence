@@ -241,7 +241,7 @@ def two_opt(tour, distance_matrix):
             for j in range(i + 2, N - (i == 0)):
                 Y1 = tour[j]
                 Y2 = tour[(j + 1) % N]
-                if gain_from_two_opt(X1, X2, Y1, Y2) >= 0.5:
+                if gain_from_two_opt(X1, X2, Y1, Y2) >= 0.001:
                     tour[i+1:j+1] = tour[i+1:j+1][::-1]
                     new_distance = tour_distance(tour, distance_matrix)
                     local_optimal = False
@@ -252,54 +252,55 @@ def two_opt(tour, distance_matrix):
         if loop_iter_count >= N:
             break
 
-    return optimal_tour, optimal_distance
+    return optimal_tour
 
 
-######################################################## Node Shift #########################################################
+########################################################### Or opt ##########################################################
 #   Step 1. Start with a random tour.                                                                                       #
-#   Step 2. For each city in the tour, check if the tour can be improved by shifting the city to a different position.      #
-#   Step 3. If the tour can be improved, then shift the city to the new position.                                           #
+#   Step 2. For each segment of the tour, check if the tour can be improved by shifting the segment to a different position.#
+#   Step 3. If the tour can be improved, then shift the segment to the new position.                                        #
 #############################################################################################################################
-def node_shift(tour, distance_matrix):
+def or_opt(tour, distance_matrix):
+    def shift_segment(tour, i, j, k, N):
+        if j > i:
+            if k > j:
+                tour = tour[:i+1] + tour[j+1:k+1] + tour[i+1:j+1] + tour[k+1:]
+            elif k < i - 1:
+                tour = tour[:k+1] + tour[i+1:j+1] + tour[k+1:i+1] + tour[j+1:]
+        elif j < i:
+            if k > j and k < i:
+                tour = tour[j+1:k+1] + tour[i+1:] + tour[:j+1] + tour[k+1:i+1]
+        return tour
 
-    def gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2):
-        del_length = distance_matrix[X0_pred][X0] + distance_matrix[X0][X0_succ] + distance_matrix[Y1][Y2]
-        add_length = distance_matrix[X0_pred][X0_succ] + distance_matrix[Y1][X0] + distance_matrix[X0][Y2]
+    def gain_from_shift_segment(X1, X2, Y1, Y2, Z1, Z2):
+        del_length = distance_matrix[X1][X2] + distance_matrix[Y1][Y2] + distance_matrix[Z1][Z2]
+        add_length = distance_matrix[X1][Y2] + distance_matrix[X2][Z1] + distance_matrix[Y1][Z2]
         return del_length - add_length
 
     N = len(tour)
-    locally_optimal = False
-    loop_iter_count = 0
+    optimal_tour = tour
+    optimal_distance = tour_distance(tour, distance_matrix)
+    seg_len = 3
 
-    while not locally_optimal:
-        locally_optimal = True
-        loop_iter_count += 1
+    for segment_len in range(seg_len, 0, -1):
+        for i in range(N):
+            X1 = tour[i]
+            X2 = tour[(i + 1) % N]
+            j = (i + segment_len) % N
+            Y1 = tour[j]
+            Y2 = tour[(j + 1) % N]
+            for shift in range(segment_len+1, N):
+                k = (j + shift) % N
+                Z1 = tour[k]
+                Z2 = tour[(k + 1) % N]
+                if gain_from_shift_segment(X1, X2, Y1, Y2, Z1, Z2) >= 0.001:
+                    tour = shift_segment(tour, i, j, k, N)
+                    new_distance = tour_distance(tour, distance_matrix)
+                    if new_distance < optimal_distance:
+                        optimal_tour = tour[:]
+                        optimal_distance = new_distance
 
-        for counter_1 in range(N):
-            i = counter_1
-            X0_pred = tour[(i + N - 1) % N]
-            X0 = tour[i]
-            X0_succ = tour[(i + 1) % N]
-
-            for counter_2 in range(1, N - 1):
-                j = (i + counter_2) % N
-                Y1 = tour[j]
-                Y2 = tour[(j + 1) % N]
-
-                if gain_from_node_shift(X0_pred, X0, X0_succ, Y1, Y2) >= 0.5:
-                    shift_size = (j - i + 1 + N) % N
-                    left = i
-                    for _ in range(shift_size):
-                        right = (left + 1) % N
-                        tour[left] = tour[right]
-                        left = right
-                    tour[j] = X0
-                    locally_optimal = False
-
-        if loop_iter_count >= N:
-            break
-            
-    return tour, tour_distance(tour, distance_matrix)
+    return optimal_tour
 
 
 ######################################################### Node Swap #########################################################
@@ -344,7 +345,7 @@ def node_swap(tour, distance_matrix):
                 Y0 = tour[j]
                 Y0_succ = tour[(j + 1) % N]
 
-                if gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ) >= 0.5:
+                if gain_from_node_swap(X0_pred, X0, X0_succ, Y0_pred, Y0, Y0_succ) >= 0.001:
                     tour[i], tour[j] = tour[j], tour[i]
                     local_optimal = False
                     new_distance = tour_distance(tour, distance_matrix)
@@ -355,7 +356,7 @@ def node_swap(tour, distance_matrix):
         if loop_iter_count >= N:
             break
 
-    return optimal_tour, optimal_distance
+    return optimal_tour
 
 
 ####################################################### Main Function #######################################################
@@ -369,7 +370,7 @@ def main():
     files = os.listdir(directory)
 
     constructive_search_methods = [nearest_neighbour, insertion_heuristic, greedy_heuristic]
-    perturbative_search_methods = [two_opt, node_shift, node_swap]
+    perturbative_search_methods = [two_opt, or_opt, node_swap]
 
     with open("output_table.csv", mode="w", newline="") as csv_file:
         writer = csv.writer(csv_file)
@@ -387,7 +388,8 @@ def main():
                     initial_time = (end_time - start_time) * 1000
                     for perturbative_search_method in perturbative_search_methods:
                         start_time = time.time()
-                        optimized_tour, optimized_distance = perturbative_search_method(tour, distance_matrix)
+                        optimized_tour = perturbative_search_method(tour.copy(), distance_matrix)
+                        optimized_distance = tour_distance(optimized_tour, distance_matrix)
                         end_time = time.time()
                         final_time = (end_time - start_time) * 1000
                         writer.writerow([file, len(cities), constructive_search_method.__name__, perturbative_search_method.__name__, initial_distance, optimized_distance, initial_time, final_time])
