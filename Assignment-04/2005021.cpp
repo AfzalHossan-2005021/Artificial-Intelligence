@@ -1,6 +1,7 @@
 #include <bits/stdc++.h>
 
 #define DATA_PATH "car evaluation dataset/car.data"
+#define TRAIN_RATIO 0.8
 
 using namespace std;
 
@@ -77,9 +78,12 @@ struct Car
     Safety safety;
 };
 
-vector<pair<Car, Label>> readDataset()
+// Define a pair for dataset sample: {features, label}
+using Sample = pair<Car, Label>;
+
+vector<Sample> readDataset()
 {
-    vector<pair<Car, Label>> dataset;
+    vector<Sample> dataset;
     ifstream file(DATA_PATH);
     if (!file.is_open())
     {
@@ -171,22 +175,45 @@ vector<pair<Car, Label>> readDataset()
     return dataset;
 }
 
+void stratifiedSplit(const vector<Sample> &dataset, double trainRatio,
+                     vector<Sample> &trainSet, vector<Sample> &testSet)
+{
+    unordered_map<Label, vector<Sample *>> classGroups;
+
+    // Group samples by their class labels
+    for (const auto &sample : dataset)
+    {
+        classGroups[sample.second].push_back(const_cast<Sample *>(&sample));
+    }
+
+    random_device rd;
+    mt19937 gen(rd());
+
+    // Split each class group into train and test sets
+    for (auto &[label, samples] : classGroups)
+    {
+        shuffle(samples.begin(), samples.end(), gen);
+
+        int splitIndex = samples.size() * trainRatio;
+        for (int i = 0; i < samples.size(); i++)
+        {
+            if (i < splitIndex)
+                trainSet.push_back(*samples[i]);
+            else
+                testSet.push_back(*samples[i]);
+        }
+    }
+}
+
 int main()
 {
-    vector<pair<Car, Label>> dataset = readDataset();
+    vector<Sample> dataset = readDataset();
 
-    for(auto data : dataset)
-    {
-        cout << "Buying: " << (int)data.first.buying << endl;
-        cout << "Maint: " << (int)data.first.maint << endl;
-        cout << "Doors: " << (int)data.first.doors << endl;
-        cout << "Persons: " << (int)data.first.persons << endl;
-        cout << "LugBoot: " << (int)data.first.lugBoot << endl;
-        cout << "Safety: " << (int)data.first.safety << endl;
-        cout << "Label: " << (int)data.second << endl;
-        cout << endl;
-    }
-    cout << "Dataset size: " << dataset.size() << endl;
+    vector<Sample> trainingSet, testSet;
+    stratifiedSplit(dataset, TRAIN_RATIO, trainingSet, testSet);
+
+    cout << "Training set size: " << trainingSet.size() << endl;
+    cout << "Test set size: " << testSet.size() << endl;
 
     return 0;
 }
